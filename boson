@@ -1,0 +1,77 @@
+#!/usr/bin/env bash
+
+# Directory where Element will be installed
+INSTALL_DIR="www"
+# Directory for temporary files - must be different than $INSTALL_DIR
+TMP_DIR="/tmp"
+# GitHub API URL for Element
+API_URL="https://api.github.com/repos/vector-im/element-web/releases/latest"
+
+check_dependencies() {
+  local is_coreutils_installed
+  local is_curl_installed
+  local is_tar_installed
+  local is_jq_installed
+
+  is_coreutils_installed=$(command -v cat)
+  is_curl_installed=$(command -v curl)
+  is_tar_installed=$(command -v tar)
+  is_jq_installed=$(command -v jq)
+
+  if [[ -z "$is_coreutils_installed" ]]; then
+    echo "You need to install coreutils package."
+  fi
+
+  if [[ -z "$is_curl_installed" ]]; then
+    echo "You need to install curl package."
+  fi
+
+  if [[ -z "$is_jq_installed" ]]; then
+    echo "You need to install jq package."
+  fi
+
+  if [[ -z "$is_tar_installed" ]]; then
+    echo "You need to install tar package."
+  fi
+
+  if [[ -z "$is_coreutils_installed" ]] || \
+     [[ -z "$is_curl_installed" ]] || \
+     [[ -z "$is_jq_installed" ]] || \
+     [[ -z "$is_tar_installed" ]]; then
+    exit 1
+  fi
+}
+
+update() {
+  # Current version
+  current_version="$(cat $INSTALL_DIR/version)"
+
+  # Latest version
+  curl \
+    -sH "Accept: application/vnd.github.v3+json" \
+    https://api.github.com/repos/vector-im/element-web/releases/latest \
+    > $TMP_DIR/element-latest.json
+
+  latest_version="$(jq -r '.name' $TMP_DIR/element-latest.json | sed s/v//)"
+
+  if [[ "$current_version" != "$latest_version" ]]; then
+    latest_download_url="$(jq -r '.assets[0].browser_download_url' \
+      $TMP_DIR/element-latest.json)"
+
+    curl -sL $latest_download_url -o $TMP_DIR/element-v${latest_version}.tar.gz
+    tar xf $TMP_DIR/element-v${latest_version}.tar.gz -C $TMP_DIR/
+    cp -r $TMP_DIR/element-v${latest_version}/* $INSTALL_DIR
+
+  else
+    echo "Element is up-to-date"
+    exit 0
+  fi
+}
+
+main() {
+  check_dependencies
+  update
+}
+
+main "$@"
+
